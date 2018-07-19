@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<!-- Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license.
+See LICENSE in the source repository root for complete license information. -->
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ Title }}</title>
+        <link rel="stylesheet" type="text/css" href="https://ajax.aspnetcdn.com/ajax/bootstrap/3.3.7/css/bootstrap.min.css" />
+        <link rel="stylesheet" type="text/css" href="https://ajax.aspnetcdn.com/ajax/bootstrap/3.3.7/css/bootstrap-theme.min.csss" />
+        <link rel="stylesheet" type="text/css" href="/static/css/site.css?version=1.22" />
+    </head>
+    <body>
+        <div class="navbar navbar-inverse navbar-fixed-top">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="icon-bar"> </span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <div class="navbar-brand">
+                        Microsoft Graph Connect sample
+                    </div>
+                </div>
+                <div class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav">
+                        <li><a href="{{ url_for('homepage') }}">Home</a></li>
+                    </ul>
+                    {% include "_LoginPartial.html" %}
+                </div>
+            </div>
+        </div>
+        <div class="container body-content">
+            <br />
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-dismissible alert-{{ category }}" role="alert">
+                        <p>
+                            {{ message|safe }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block Body %}{% endblock %}
+            <!--<p><button type="button" class="btn btn-success btn-lg" onclick="window.location.href='/login'">Connect</button></p>-->
+
+            <hr />
+            <footer>
+                <p>
+                    &copy; {{ Year }} - {{ Title }}
+                </p>
+            </footer>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,350 @@
+<!--  Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license.
+      See LICENSE in the source repository root for complete license information. -->
+
+{% extends "_Layout.html" %}
+{% block Body %}
+
+<h1>{{ Title }}</h1>
+<div class="container-fluid">
+    <label>Click "Analyst logon" button to get started</label>
+    <div class="row">
+        <div class="col-md-2">
+            <button class="btn btn-default form-control" id="get-my-email-address" onclick="window.location.href='/GetMyEmailAddress'">Analyst Logon</button>
+        </div>
+        <div class="col-md-4">
+            {% if 'access_token' in session %}
+            <pre id="user-email-address" name="user-email-address">{{ session['email'] }}</pre>
+            {% else %}
+            <pre id="user-email-address" name="user-email-address"></pre>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<hr>
+
+
+<form action="{{ url_for('get_alerts') }}" method="POST">
+    <h3>Select alerts to view</h3>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-1">
+                <div class="form-group">
+                    <label for="SelectTop">Top X</label>
+                    <select id="SelectTop" class="form-control" name="Top" runat="server" value="{{ session.get('alertData').Top }}">
+                        <option value=1>1</option>
+                        <option value=2>2</option>
+                        <option value=5 selected="selected">5</option>
+                        <option value=10>10</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="SelectProvider">Provider</label>
+                    <br>
+                    <select id="SelectProvider" name="Provider" class="form-control" runat="server" value="{{ session.get('alertData').Provider }}" selected="{{ session.get('alertData').Provider }}">
+                        <option value="All" selected="selected">All</option>
+                        {% if session.get('providers') %}
+                            {% for provider in session.get('providers') %}
+                                <option value="{{ provider }}">{{ provider }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="SelectCategory">Category</label>
+                    <select id="SelectCategory" name="Category" class="form-control" runat="server" value="{{ session.get('alertData').Category }}">
+                        <option value="All" selected="selected">All</option>
+                        <option value="abnormalLogin">abnormalLogin</option>
+                        <option value="anomalousDataAccess">anomalousDataAccess</option>
+                        <option value="anonymousLogin">anonymousLogin</option>
+                        <option value="antimalwareActionTaken">antimalwareActionTaken</option>
+                        <option value="azBlackListLogin">azBlackListLogin</option>
+                        <option value="credentialLeakage">credentialLeakage</option>
+                        <option value="documentDeclassification">documentDeclassification</option>
+                        <option value="reconnaissance">reconnaissance</option>
+                        <option value="exploit">exploit</option>
+                        <option value="impossibleTravel">impossibleTravel</option>
+                        <option value="keyloggerTrojan">keyloggerTrojan</option>
+                        <option value="malware">malware</option>
+                        <option value="ransomware">ransomware</option>
+                        <option value="rdpBruteforce">rdpBruteforce</option>
+                        <option value="reportCompromise">reportCompromise</option>
+                        <option value="riskScore">riskScore</option>
+                        <option value="sensitiveFileExfiltration">sensitiveFileExfiltration</option>
+                        <option value="suspiciousActivity">suspiciousActivity</option>
+                        <option value="suspiciousDomain">suspiciousDomain</option>
+                        <option value="suspiciousPowerShell">suspiciousPowerShell</option>
+                        <option value="threatIntelligence">threatIntelligence</option>
+                        <option value="unfamiliarLocation">unfamiliarLocation</option>
+                        <option value="updateRequired">updateRequired</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="SelectStatus">Status</label>
+                    <select id="SelectStatus" name="Status" class="form-control" runat="server" value="{{ session.get('alertData').Status }}">
+                        <option value="All" selected="selected">All</option>
+                        <option value="NewAlert">NewAlert</option>
+                        <option value="InProgress">InProgress</option>
+                        <option value="Resolved">Resolved</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="SelectSeverity">Severity</label>
+                    <select id="SelectSeverity" name="Severity" class="form-control" runat="server" value="{{ session.get('alertData').Severity }}">
+                        <option value="All" selected="selected">All</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="AssignedToMe">Assigned to me</label>
+                    <br>
+                    <input type="checkbox" id="AssignedToMe"
+                        name="AssignedToMe"
+                        value="AssignedToMe" />
+                </div>
+            </div>
+            <br>
+        </div>
+        <br>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="fqdn">Fully Qualified Domain Name (FQDN)</label>
+                    <input name="HostFqdn" type="text" id="fqdn" class="form-control" value="{{ session.get('alertData').HostFqdn }}" placeholder="Enter FQDN" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="upn">User Principal Name (UPN)</label>
+                    <input name="Upn" type="text" id="upn" class="form-control" value="{{ session.get('alertData').Upn }}" placeholder="Enter UPN" />
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="get-alerts">&nbsp;</label>
+                    <button class="btn btn-primary form-control" id="get-alerts" ng-model="GetAlertsClicked">
+                        <b class="text-center">Get alerts</b>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% if 'GetAlertResults' in ViewData %}
+<div class="panel panel-default">
+    <div class="panel-heading">Alert details</div>
+    <div class="panel-body">
+        <div class="container-fluid col-md-12">
+            REST query: <a href="https://developer.microsoft.com/en-us/graph/graph-explorer?request=security/{{ ViewData.get('QueryDetails') }}&method=GET&version={{ Config.ISG_VERSION }}&GraphUrl=https://graph.microsoft.com">'{{ Config.ISG_URL }}{{ ViewData.get('QueryDetails') }}'</a>
+            <br />
+            <br />
+            {% if ViewData.get('GetAlertResults') == 'Incorrect Tenant Account' %}
+            Please sign in using a *.onmicrosoft.com account to view the demo data.
+            {% elif ViewData.get('GetAlertResults').value %}
+
+            <table>
+                <tr>
+                    <th><b>Title</b></th>
+                    <th><b>Category</b></th>
+                    <th><b>Severity</b></th>
+                    <th><b>Status</b></th>
+                    <th><b>Provider</b></th>
+                    <th><b>AssignedTo</b></th>
+                    <th><b>ID</b></th>
+                </tr>
+
+                {% for alert in ViewData.get('GetAlertResults').value %}
+                <tr>
+                    <td>
+                        <a href="/DisplayAlert/{{ alert.id }}" target="_blank\">
+                            <div style="height:100%;width:100%">
+                                {{ alert.title }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>{% if alert.category %} {{alert.category}} {% else %} {% endif %}</td>
+                    <td>{% if alert.severity %} {{ alert.severity }} {% else %} {% endif %}</td>
+                    <td>{{ alert.status }}</td>
+                    <td>{{ alert.vendorInformation.provider }}</td>
+                    <td>{% if alert.assignedTo %}{{ alert.assignedTo }} {% else %} {% endif %}</td>
+                    <td>{{ alert.id }}</td>
+                </tr>
+                {% endfor %}
+
+            </table>
+            {% else %}
+            No matching alerts
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<hr>
+
+
+<form action="{{ url_for('update_alert') }}" method="POST">
+    <h3>Manage Alerts</h3>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="AlertId">Alert Id</label>
+                <input name="AlertId" id="AlertId" type="text" class="form-control" value="{{ session.get('UpdateAlertData').AlertId }}" placeholder="Enter alert ID" />
+            </div>
+            <div class="col-md-2">
+                <label for="SelectStatusToUpdate">Status</label>
+                <select id="SelectStatusToUpdate" name="SelectStatusToUpdate" class="form-control" runat="server" value="{{ session.get('UpdateAlertData').SelectStatusToUpdate }}">
+                    <option value="NewAlert">NewAlert</option>
+                    <option value="InProgress">InProgress</option>
+                    <option value="Resolved">Resolved</option>
+                </select>
+            </div>
+            <!--<div class="col-sm-1">
+                Severity
+                <select id="SelectSeverityToUpdate" name="SelectSeverityToUpdate" runat="server" value="{{ session.get('UpdateAlertData').SelectSeverityToUpdate }}">
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>-->
+            <div class="col-md-2">
+                <label for="SelectFeedbackToUpdate">Feedback</label>
+                <select id="SelectFeedbackToUpdate" name="SelectFeedbackToUpdate" class="form-control" runat="server" value="{{ session.get('UpdateAlertData').SelectFeedbackToUpdate }}">
+                    <option value="Unknown">Unknown</option>
+                    <option value="truePositive">TruePositive</option>
+                    <option value="falsePositive">FalsePositive</option>
+                    <option value="benignPositive">BenignPositive</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="comments">Comments</label>
+                <!--<input name="Comments" type="text" class="form-control" value="{# session.get('UpdateAlertData').Comments #}" placeholder="Enter comments" />-->
+                <textarea id="comments" rows="3" cols="30" name="Comments" class="form-control" placeholder="Enter comments">{{ session.get('UpdateAlertData').Comments }}</textarea>
+            </div>
+        </div>
+
+        <br />
+        <div class="row">
+            <div class="col-md-2">
+                <button class="btn btn-primary form-control" id="update-alerts">
+                    <b class="text-center">Update alert</b>
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<br>
+
+{% if 'UpdateAlertResults' in ViewData or 'UpdateAlertError' in ViewData %}
+<div class="panel panel-default" ng-show="GetAlertsClicked">
+    <div class="panel-heading">Alert details</div>
+    <div class="panel-body">
+        {% if 'UpdateQueryDetails' in ViewData %}
+        {{ ViewData.UpdateQueryDetails }}
+        <br />
+        {{ ViewData.UpdateQueryBody }}
+        <br />
+        <br />
+        <b>Original Alert Details:</b>
+        <table>
+            <tr>
+                <th><b>Title</b></th>
+                <th><b>Category</b></th>
+                <th><b>Severity</b></th>
+                <th><b>Status</b></th>
+                <th><b>Feedback</b></th>
+                <th><b>Provider</b></th>
+                <th><b>AssignedTo</b></th>
+                <th><b>Comments</b></th>
+            </tr>
+            <tr>
+                <td>
+                    <a href="/DisplayAlert/{{ ViewData.OldAlert.id }}" target="_blank\">
+                        <div style="height:100%;width:100%">
+                            {{ ViewData.OldAlert.title }}
+                        </div>
+                    </a>
+                </td>
+                <td>{{ ViewData.OldAlert['category'] }}</td>
+                <td>{% if ViewData.OldAlert['severity'] %} {{ ViewData.OldAlert['severity'] }} {% else %} {% endif %}</td>
+                <td>{{ ViewData.OldAlert['status'] }}</td>
+                <td>{{ ViewData.OldAlert['feedback'] }}</td>
+                <td>{{ ViewData.OldAlert['vendorInformation'].provider }}</td>
+                <td>{% if ViewData.OldAlert['assignedTo'] %} {{ ViewData.OldAlert['assignedTo'] }} {% else %} {% endif %}</td>
+                <td>{{ ViewData.OldAlert['comments'] }}</td>
+            </tr>
+        </table>
+        <br />
+        <b>Updated Alert Details:</b>
+        <table>
+            <tr>
+                <th><b>Title</b></th>
+                <th><b>Category</b></th>
+                <th><b>Severity</b></th>
+                <th><b>Status</b></th>
+                <th><b>Feedback</b></th>
+                <th><b>Provider</b></th>
+                <th><b>AssignedTo</b></th>
+                <th><b>Comments</b></th>
+            </tr>
+            <tr>
+                <td>
+                    <a href="/DisplayAlert/{{ ViewData.UpdateAlertResults.id }}" target="_blank\">
+                        <div style="height:100%;width:100%">
+                            {{ ViewData.UpdateAlertResults.title }}
+                        </div>
+                    </a>
+                </td>
+                <td>{{ ViewData.UpdateAlertResults.category }}</td>
+                <td>{% if ViewData.UpdateAlertResults.severity %} {{ ViewData.UpdateAlertResults.severity }} {% endif %}</td>
+                <td>{{ ViewData.UpdateAlertResults.status }}</td>
+                <td>{{ ViewData.UpdateAlertResults.feedback }}</td>
+                <td>{{ ViewData.UpdateAlertResults.vendorInformation.provider }}</td>
+                <td>{% if ViewData.UpdateAlertResults.assignedTo %} {{ ViewData.UpdateAlertResults.assignedTo }} {% endif %}</td>
+                <td>{{ ViewData.UpdateAlertResults.comments }}</td>
+            </tr>
+        </table>
+        {% else %}
+        {{ ViewData.UpdateAlertError }}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+<hr>
+
+<form action="{{ url_for('email_alert') }}" method="POST">
+    <h3>Send email notification for latest alert</h3>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-5">
+                <label for="recipients">Recipients</label>
+                <input name="recipients" id="recipients" type="text" class="form-control" value="{% if 'EmailRecipients' in ViewData %}{{ ViewData['EmailRecipients'] }}{% elif session.get('email') %}{{ session.get('email') }}{% endif %}" placeholder="Enter recipients email addresses, seperated by semicolon" />
+            </div>
+            <div class="col-md-2">
+                <label for="send-email">&nbsp;</label>
+                <button class="btn btn-primary form-control" id="send-email">
+                    <b class="text-center">Send email</b>
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% if 'EmailResults' in ViewData %}
+{{ ViewData['EmailResults'] }}
+{% endif %}
+
+{% endblock %}
