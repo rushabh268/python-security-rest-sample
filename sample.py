@@ -148,7 +148,8 @@ def get_alerts():
 
         VIEW_DATA['GetAlertResults'] = filteredAlerts
 
-        MSGRAPH.base_url = config.RESOURCE + config.API_VERSION + '/'
+        #MSGRAPH.base_url = config.RESOURCE + config.API_VERSION + '/'
+        MSGRAPH.base_url = config.RESOURCE + '/'
     return flask.redirect(flask.url_for('homepage'))
 
 def get_alerts_from_graph():
@@ -233,6 +234,7 @@ def update_security_alert(alertId, newData):
 def get_top_security_alert():
     """Helper to get the most recent security graph alert."""
     MSGRAPH.base_url = config.ISG_URL
+    print('MSGRAPH.base_url:', MSGRAPH.base_url)
     most_recent_alert = MSGRAPH.get('alerts/?$top=1', headers=request_headers()).data
     if b'' in most_recent_alert:
         print("Please Sign-in using a on.microsoft.com account for demo data")
@@ -341,8 +343,7 @@ def request_headers(headers=None):
     return default_headers
 
 
-def sendmail(*, client, subject=None, recipients=None, body='',
-             content_type='HTML', attachments=None):
+def sendmail(client, subject=None, recipients=None, body='', content_type='HTML', attachments=None):
     """Helper to send email from current user.
 
     client       = user-authenticated flask-oauthlib client instance
@@ -393,4 +394,4 @@ def sendmail(*, client, subject=None, recipients=None, body='',
 
 
 if __name__ == '__main__':
-    APP.run()
+    APP.run(host='10.0.0.5', port=5000)

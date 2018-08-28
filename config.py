@@ -7,9 +7,9 @@ other secure storage mechanism.
 # Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
 # See LICENSE in the project root for license information.
 
-CLIENT_ID = 'ENTER_YOUR_APP_ID_HERE'
-CLIENT_SECRET = 'ENTER_YOUR_APP_SECRET_HERE'
-REDIRECT_URI = 'http://localhost:5000/login/authorized'
+CLIENT_ID = '47f1ad04-97a5-4b58-8729-e889eaccfedb'
+CLIENT_SECRET = 'ckpUJERC72*;tjiaCC240}~'
+REDIRECT_URI = 'https://alert-isg-tool.westus.cloudapp.azure.com/login/authorized'
 
 # AUTHORITY_URL ending determines type of account that can be authenticated:
 # /organizations = organizational accounts only
@@ -20,10 +20,12 @@ AUTHORITY_URL = 'https://login.microsoftonline.com/common'
 AUTH_ENDPOINT = '/oauth2/v2.0/authorize'
 TOKEN_ENDPOINT = '/oauth2/v2.0/token'
 
-RESOURCE = 'https://graph.microsoft.com/'
-API_VERSION = 'v1.0'
-ISG_VERSION = 'beta'
-ISG_URL = RESOURCE + ISG_VERSION +'/security/'
+RESOURCE = 'https://security-isg.westus.cloudapp.azure.com/'
+#API_VERSION = 'v1.0'
+API_VERSION = ''
+#ISG_VERSION = 'beta'
+ISG_VERSION = ''
+ISG_URL = RESOURCE + ISG_VERSION + 'security/'
 SCOPES = ['User.Read'] # Add other scopes/permissions as needed.
 
 # This code can be removed after configuring CLIENT_ID and CLIENT_SECRET above.
