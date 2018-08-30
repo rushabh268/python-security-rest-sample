@@ -10,11 +10,19 @@ import time
 import urllib
 import json
 from functools import wraps
-
 import flask
 from flask_oauthlib.client import OAuth
-
 import config
+import base64
+from flask import request, make_response, jsonify
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
+#from urllib.request import urlopen
+from jose import jwt, jwk
+from jose.utils import base64url_decode
+import os
 
 APP = flask.Flask(__name__, template_folder='static/templates')
 APP.debug = True
@@ -72,11 +80,11 @@ def authorized():
         flask.session.pop('access_token', None) 
         VIEW_DATA.clear()
         return flask.redirect('/')
-    # redirected from authentication
+    #redirected from authentication
     if str(flask.session['state']) != str(flask.request.args['state']):
         raise Exception('state returned to redirect URL does not match!')
     response = MSGRAPH.authorized_response()
-    #print("authorized response : ", response)
+    print("authorized response : ", response)
     flask.session['access_token'] = response['access_token']
     flask.session['scopes'] = response['scope'].split()
     flask.session['providers'] = get_providers()
@@ -85,7 +93,7 @@ def authorized():
 def get_providers():
     top_alerts = get_top_security_alert()
     providers = []
-    print(top_alerts)
+    #print(top_alerts)
     for alert in top_alerts.get('value'):
         providers.append(alert.get("vendorInformation").get("provider"))
     return providers
@@ -98,6 +106,166 @@ def logout():
     flask.session.clear()
     VIEW_DATA.clear()
     return flask.redirect(flask.url_for('homepage'))
+
+
+"""
+Wrapper function to handle Authorization 
+"""
+def authorize(f):
+    """ warpper that checks the Authorization header """
+    @wraps(f)
+    def decorated(*args, **kwargs) :
+        auth_header = request.headers.get("Authorization")
+        x_query_vendor = request.headers.get("X-Query-Vendor")
+        print("Authorization Header : ", auth_header)
+        print("X-Query-Vendor: ", x_query_vendor)
+        if (not auth_header):
+            response = make_response("Forbidden: Auth Header is null", 403)
+            print("403 Auth header is null : ", request.headers)
+            return response
+        if (auth_header.startswith("Basic")):
+            authenticated = handle_basic_auth(auth_header, x_query_vendor)
+        elif (auth_header.startswith("MSAuth1.0")):
+            authenticated = handle_token_auth(auth_header)
+        else:
+            response = make_response("Unauthorized: Unsupported Auth type", 401)
+            print("401 Unsupported Auth type : ", request.headers)
+            return response
+
+        if (not authenticated):
+            response = make_response("Forbidden: Invalid auth info ", 403)
+            print("403 Invalid auth info : ", request.headers)
+            return response
+        return f(*args, **kwargs)
+    return decorated
+
+def handle_basic_auth(basic_auth, x_query_vendor):
+    """verify that the key passed in the Auth header is valid"""
+    basic_data = basic_auth.split()
+    print('basic_data :', basic_data)
+    print('x-query-vendor:', x_query_vendor)
+    print('BASIC_TEST_KEY : ',config.BASIC_TEST_KEY)
+    if (len(basic_data) >= 2 and config.BASIC_TEST_KEY == basic_data[1]):
+        print("basic_data encoded : ", basic_data[1])
+        return True
+    else:
+        return False
+    '''
+    if (len(basic_data) >= 2):
+        basic_key = base64.b64decode(basic_data[1]).decode()
+        if x_query_vendor != '':
+           basic_key_parsed = basic_key
+        elif x_query_vendor == '':
+           basic_key_parsed = basic_key[1:]
+        print("basic_data encoded : ", basic_key_parsed)
+        if config.BASIC_TEST_KEY == basic_key_parsed:
+           print("basic_data encoded : ", basic_key_parsed)
+           return True
+    else:
+        return False
+    '''
+
+def handle_token_auth(token_auth):
+    """verify that that token passed in the Auth header is valid"""
+    # print("Handle token auth", token_auth)
+    token_auth = token_auth[len("MSAuth1.0 "):]
+    token_auth = token_auth.split(",")
+    if (len(token_auth) != 3):
+        print('Auth token contains {} segments'.format(len(token_auth)))
+        return False
+
+    tokens = parse_tokens(token_auth) 
+    #print(tokens)
+    if (len(tokens) != 3):
+        print("malformed authorization header: header conatins {} values, 3 expected".format(len(tokens)), )
+        return False
+    print("Tokens : ", tokens)
+    #access_token_body = jwt.get_unverified_claims(tokens.get("accesstoken"))
+
+   # print("JWT AccessToken Body: ", access_token_body)
+    if verify_token(tokens.get("actortoken")):
+        return True
+    return False
+
+def parse_tokens(token_auth):
+    """parse the Auth header and returns the tokens in a dictionary"""
+    tokens = {}
+    for item in token_auth:
+        token_type = item.split('=')
+        if (len(token_type) != 2):
+            print("malformed authorization header: no '=' sign", )
+            tokens =  {}
+            break
+        token_type[1] = token_type[1].replace("\"", "")
+        token = token_type[1].split()
+        # print (token_type[0] , " : ", token)
+        if len(token) == 1:
+            tokens[token_type[0]] = token[0]
+        if len(token) == 2:
+            tokens[token_type[0]] = token[1]
+    return tokens
+
+
+def verify_token(token):
+    """ 
+    Check the actor token to make sure it is valid, 
+    source: https://auth0.com/blog/using-python-flask-and-angular-to-build-modern-web-apps-part-2/
+    """
+    # token = tokens.get("actortoken")
+
+    jsonurl = urlopen('https://login.microsoftonline.com/common/discovery/v2.0/keys') ## MS public keys 
+    jwks = json.loads(jsonurl.read())
+    unverified_header = jwt.get_unverified_header(token)
+    rsa_key = {}
+    for key in jwks['keys']:
+        if key['kid'] == unverified_header['kid']:
+            rsa_key = {
+                'kty': key['kty'],
+                'kid': key['kid'],
+                'use': key['use'],
+                'n': key['n'],
+                'e': key['e']
+            }
+    if rsa_key:        
+        try:
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=config.ALGORITHMS,
+                audience=config.API_AUDIENCE,
+            )
+
+        except jwt.ExpiredSignatureError:
+            raise AuthError({
+                'code': 'token_expired',
+                'description': 'Token expired.'
+            }, 401)
+
+        except jwt.JWTClaimsError:
+            raise AuthError({
+                'code': 'invalid_claims',
+                'description': 'Incorrect claims. Please, check the audience.'
+            }, 401)
+        except Exception:
+            raise AuthError({
+                'code': 'invalid_header',
+                'description': 'Unable to parse authentication token.'
+            }, 400)
+
+        print("JWT Actortoken Payload : ")
+        print(payload)
+        return True
+
+    raise AuthError({
+        'code': 'invalid_header',
+        'description': 'Unable to find the appropriate key.'
+    }, 400)
+    
+    
+class AuthError(Exception):
+    def __init__(self, error, status_code):
+        self.error = error
+        self.status_code = status_code
 
 #Used to decorate methods that require authentication.
 def requires_auth(f):
@@ -112,6 +280,7 @@ def requires_auth(f):
 
 @APP.route('/GetMyEmailAddress')
 @requires_auth
+#@authorize
 def get_my_email_address():
     """Make Rest API call to graph for current users email"""
     VIEW_DATA.clear() # reset data passed to the Graph.html
@@ -126,6 +295,7 @@ def get_my_email_address():
     return flask.redirect(flask.url_for('homepage'))
 
 @APP.route('/GetAlerts', methods = ['POST', 'GET'])
+#@authorize
 @requires_auth
 def get_alerts():
     """Make Rest API call to security graph for alerts"""
@@ -138,6 +308,8 @@ def get_alerts():
         flask.session['alertData'] = alert_data
          
         filteredAlerts = get_alerts_from_graph()
+        print(filteredAlerts)
+        '''
         if b'' in filteredAlerts:
             print("Please Sign-in using a on.microsoft.com account for demo data")
             filteredAlerts = "Incorrect Tenant Account"
@@ -145,22 +317,24 @@ def get_alerts():
             if filteredAlerts['error']['code'] == 'InvalidAuthenticationToken':
 
                 return flask.redirect(flask.url_for('login'))
-
+        '''
         VIEW_DATA['GetAlertResults'] = filteredAlerts
 
-        #MSGRAPH.base_url = config.RESOURCE + config.API_VERSION + '/'
-        MSGRAPH.base_url = config.RESOURCE + '/'
+        MSGRAPH.base_url = config.RESOURCE + config.API_VERSION + '/'
+        #MSGRAPH.base_url = config.RESOURCE + '/'
     return flask.redirect(flask.url_for('homepage'))
 
 def get_alerts_from_graph():
     """Helper to Make Rest API call to graph by building the query"""
     MSGRAPH.base_url = config.ISG_URL
     alert_data = flask.session['alertData']
+    print(alert_data)
     filteredQuery = ""
     if 'AssignedToMe' in alert_data :
         filteredQuery += "assignedTo eq '" + flask.session['email'] +"'"
     if not alert_data:
         VIEW_DATA['QueryDetails'] = "REST query: '" + MSGRAPH.base_url + 'alerts/?$top=5' + "'"
+        print("Headers : ", request_headers())
         return MSGRAPH.get('alerts/?$top=5', headers=request_headers()).data
     else:
         if (alert_data['Category'] != "All"):
@@ -187,19 +361,44 @@ def get_alerts_from_graph():
     addFilter = ""
     if filteredQuery != ("$top=" + alert_data['Top']):
         addFilter = '$filter='
-
+    #print("Headers : ", request.headers)
+    #print("Url args: ", request.args)
     query = "alerts/?" + addFilter + filteredQuery
     VIEW_DATA['QueryDetails'] = query
     query = urllib.parse.quote(query,safe="/?$='&") #cleans up the url
-    return MSGRAPH.get(query, headers=request_headers()).data
+    
+    demo_data = get_demo_data()
+    demo_data["@odata.context"] = "https://{}/security/$metadata#alerts".format(request.host)
+    #print('type of alert data:', type(demo_data["value"]))
+    resp = make_response(jsonify(demo_data), 200)
+    resp = demo_data
+    return resp
+        
+    #return MSGRAPH.get(query, headers=request_headers()).data
+
+def get_demo_data():
+    """Gets the demo data from a json file"""
+    demo_data = {}
+    cwd = os.getcwd()
+    with open(os.path.join(cwd, "demo_data.json"), 'r') as f:
+        demo_data = json.load(f)
+    for alert in demo_data.get('value'):
+        vendor_info = alert.get('vendorInformation')
+        vendor_info['provider'] = config.PROVIDER_NAME
+        vendor_info['vendor'] = config.VENDOR_NAME
+        alert['vendorInformation'] = vendor_info
+    return demo_data
+
 
 @APP.route('/DisplayAlert/<alertId>')
 @requires_auth
+#@authorize
 def display_alert(alertId):
     """Renders the alert page"""
     alert = get_alert_by_id(alertId)
+    print(alert)
     jsonAlert = json.dumps(alert, sort_keys=True, indent=4, separators=(',', ': '))
-    return flask.render_template('alert.html', Title="Alert Details"
+    return flask.render_template('Alert.html', Title="Alert Details"
                                 ,Year=datetime.date.today().strftime("%Y")
                                 ,Alert=jsonAlert, AlertId=alertId, Config=config)
 
@@ -235,17 +434,21 @@ def get_top_security_alert():
     """Helper to get the most recent security graph alert."""
     MSGRAPH.base_url = config.ISG_URL
     print('MSGRAPH.base_url:', MSGRAPH.base_url)
+    print(request)
     most_recent_alert = MSGRAPH.get('alerts/?$top=1', headers=request_headers()).data
+    print(most_recent_alert)
     if b'' in most_recent_alert:
         print("Please Sign-in using a on.microsoft.com account for demo data")
         most_recent_alert = None
     elif 'error' in most_recent_alert:
         most_recent_alert = None
     MSGRAPH.base_url = config.RESOURCE + config.API_VERSION + '/'
+    print('most_recent_alert:', most_recent_alert)
     return most_recent_alert
 
 
 @APP.route('/UpdateAlert', methods = ['POST', 'GET'])
+#@authorize
 @requires_auth
 def update_alert():
     """ Make Rest API call to security graph to update an alert """
@@ -288,6 +491,7 @@ def update_alert():
     return flask.redirect(flask.url_for('homepage'))
 
 @APP.route('/EmailAlert', methods = ['POST', 'GET'])
+#@authorize
 @requires_auth
 def email_alert():
     """Handler for email_alert route."""
@@ -337,7 +541,10 @@ def request_headers(headers=None):
     default_headers = {'SdkVersion': 'sample-python-flask',
                        'x-client-SKU': 'sample-python-flask',
                        'client-request-id': str(uuid.uuid4()),
-                       'return-client-request-id': 'true'}
+                       'return-client-request-id': 'true', 
+                       'Authorization': 'Basic OmFXeHNkVzFwYnkxemFHRnlaV1F0YzJWamNtVjBMV3RsZVE9PQ==',
+                       'x-query-vendor': 'illumio',
+                       'x-query-tenant-id': '6524ae-fdceab-2321-12daef'}
     if headers:
         default_headers.update(headers)
     return default_headers
